@@ -2,7 +2,7 @@
 from typing import Any, Dict, List, Optional
 
 from ..http_client import HTTPClient
-from ..models.guild import Guild, Role, Emoji, Sticker
+from ..models.guild import Guild, Role
 from ..models.user import Member
 
 
@@ -273,29 +273,29 @@ class GuildsAPI:
         """
         return await self._http.get(f'/guilds/{guild_id}/bans/{user_id}')
 
-    async def get_emojis(self, guild_id: str) -> List[Emoji]:
+    async def get_emojis(self, guild_id: str) -> List[Dict]:
         """Get guild emojis.
 
         Args:
             guild_id: Guild ID.
 
         Returns:
-            List of Emojis.
+            List of emoji dicts.
         """
         data = await self._http.get(f'/guilds/{guild_id}/emojis')
-        return [Emoji.from_dict(e) for e in data]
+        return data
 
-    async def get_stickers(self, guild_id: str) -> List[Sticker]:
+    async def get_stickers(self, guild_id: str) -> List[Dict]:
         """Get guild stickers.
 
         Args:
             guild_id: Guild ID.
 
         Returns:
-            List of Stickers.
+            List of sticker dicts.
         """
         data = await self._http.get(f'/guilds/{guild_id}/stickers')
-        return [Sticker.from_dict(s) for s in data]
+        return data
 
     async def get_prune_count(
         self,

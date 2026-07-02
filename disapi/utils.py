@@ -43,7 +43,7 @@ __all__ = [
     'generate_session_id',
     'escape_markdown',
     'unescape_markdown',
-    'strip_markdown",
+    'strip_markdown',
     'format_timestamp',
     'parse_timestamp',
 
