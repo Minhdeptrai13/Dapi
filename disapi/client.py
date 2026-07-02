@@ -174,8 +174,6 @@ class Client:
             proxy=self._options.proxy,
             timeout=self._options.timeout,
             max_retries=self._options.max_retries,
-            debug=self._options.debug,
-            rate_limiter=self._rate_limiter,
         )
         
         # Initialize Gateway
