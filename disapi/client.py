@@ -21,6 +21,7 @@ Warning:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from datetime import datetime
@@ -54,6 +55,38 @@ __all__ = ["Client", "SyncClient", "ClientOptions"]
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
+
+
+def _create_model(cls: Any, data: Dict[str, Any]) -> Any:
+    """
+    Safely create a model instance from API data.
+    
+    Tries:
+        1. cls.from_data(data) if available
+        2. cls(data) if it accepts a single dict (common pattern)
+        3. cls(**data) with filtering of unknown kwargs
+    """
+    # 1. from_data
+    if hasattr(cls, "from_data"):
+        return cls.from_data(data)
+    
+    # 2. single argument (data dict)
+    sig = inspect.signature(cls.__init__)
+    params = list(sig.parameters.values())
+    # If __init__ expects exactly one parameter besides self
+    if len(params) == 1:
+        # it might accept data dict
+        try:
+            return cls(data)
+        except Exception:
+            pass
+    
+    # 3. filter kwargs to match __init__ parameters
+    init_params = set(sig.parameters.keys())
+    # remove 'self'
+    init_params.discard("self")
+    filtered = {k: v for k, v in data.items() if k in init_params}
+    return cls(**filtered)
 
 
 class ClientOptions:
@@ -98,7 +131,8 @@ class ClientOptions:
         self.log_level = log_level
         self.suppress_warnings = suppress_warnings
         self.enable_gateway = enable_gateway
-        self.gateway_intents = gateway_intents
+        # THÊM intents cần thiết để nhận tin nhắn
+        self.gateway_intents = gateway_intents | 512 | 32768  # GUILD_MESSAGES + MESSAGE_CONTENT
         self.auto_reconnect = auto_reconnect
         self.heartbeat_interval = heartbeat_interval
         self.health_check_interval = health_check_interval
@@ -188,6 +222,7 @@ class Client:
                 token=token,
                 config=gateway_config,
                 auto_reconnect=self._options.auto_reconnect,
+                client=self,   # <--- QUAN TRỌNG: gán client để gateway gọi dispatch
             )
         
         # Initialize API modules
@@ -200,7 +235,7 @@ class Client:
         self.presence = PresenceAPI(self._http)
         self.misc = MiscAPI(self._http)
         
-        setup_logging(self._options.log_level, self._options.debug)
+        setup_logging(self._options.log_level)
         logger.debug(f"Client initialized (gateway={'enabled' if self._gateway else 'disabled'})")
 
     async def __aenter__(self) -> Client:
@@ -224,7 +259,7 @@ class Client:
         
         try:
             self._connecting = True
-            await self._http.connect()
+            # Không cần gọi self._http.connect() vì HTTPClient tự tạo session
             self._closed = False
             self._last_connection_time = time.time()
             self._reconnect_count = 0
@@ -287,9 +322,9 @@ class Client:
         
         try:
             logger.debug("Authenticating...")
-            user_data = await self._http.request("GET", "/users/@me")
-            self.user = User(user_data)
-            logger.info(f"Logged in as {self.user['username']}#{self.user['discriminator']}")
+            user_data = await self._http.get("/users/@me")
+            self.user = _create_model(User, user_data)
+            logger.info(f"Logged in as {self.user.username}#{self.user.discriminator}")
             
             # Dispatch login event
             await self._dispatch_event("LOGIN", {"user": user_data})
@@ -311,7 +346,7 @@ class Client:
                 
                 # Check if HTTP is healthy
                 try:
-                    await self._http.request("GET", "/users/@me", timeout=5.0)
+                    await self._http.get("/users/@me")
                     self._reconnect_backoff = 1.0
                 except Exception as e:
                     logger.warning(f"Health check failed: {e}")
@@ -382,13 +417,10 @@ class Client:
         return decorator
 
     async def _dispatch_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Dispatch event to all registered handlers.
-        
-        Args:
-            event_type: Event type.
-            data: Event data.
-        """
+        """Dispatch event to all registered handlers."""
+        logger.debug(f"Dispatching event: {event_type}")
         if event_type not in self._event_handlers:
+            logger.debug(f"No handlers for {event_type}")
             return
         
         handlers = self._event_handlers[event_type]
@@ -425,8 +457,8 @@ class Client:
         Returns:
             User object.
         """
-        data = await self._http.request("GET", f"/users/{user_id}")
-        return User(data)
+        data = await self._http.get(f"/users/{user_id}")
+        return _create_model(User, data)
 
     async def get_channel(self, channel_id: str) -> Channel:
         """Get channel by ID.
@@ -437,8 +469,8 @@ class Client:
         Returns:
             Channel object.
         """
-        data = await self._http.request("GET", f"/channels/{channel_id}")
-        return Channel(data)
+        data = await self._http.get(f"/channels/{channel_id}")
+        return _create_model(Channel, data)
 
     async def get_guild(self, guild_id: str) -> Guild:
         """Get guild by ID.
@@ -449,8 +481,8 @@ class Client:
         Returns:
             Guild object.
         """
-        data = await self._http.request("GET", f"/guilds/{guild_id}")
-        return Guild(data)
+        data = await self._http.get(f"/guilds/{guild_id}")
+        return _create_model(Guild, data)
 
     async def get_message(self, channel_id: str, message_id: str) -> Message:
         """Get message by ID.
@@ -462,11 +494,8 @@ class Client:
         Returns:
             Message object.
         """
-        data = await self._http.request(
-            "GET", 
-            f"/channels/{channel_id}/messages/{message_id}"
-        )
-        return Message(data)
+        data = await self._http.get(f"/channels/{channel_id}/messages/{message_id}")
+        return _create_model(Message, data)
 
     @property
     def gateway(self) -> Optional[Gateway]:
@@ -487,7 +516,6 @@ class Client:
     def latency(self) -> float:
         """Get estimated latency in seconds."""
         return self._latency
-
 
 
 class SyncClient:
@@ -673,4 +701,3 @@ class SyncClient:
     def is_closed(self) -> bool:
         """Check if client is closed."""
         return self._client.is_closed
-
