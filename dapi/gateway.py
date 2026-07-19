@@ -1,9 +1,9 @@
-
+"""
 gateway.py — Discord Gateway WebSocket Handler (ELITE v4.0)
-
+============================================================
 
 Production-grade Gateway client with client integration.
-
+"""
 
 from __future__ import annotations
 
@@ -38,15 +38,9 @@ from .constants import (
 from .exceptions import ConnectionClosed, GatewayException
 
 __all__ = ["Gateway", "GatewayConfig", "EventType"]
-<<<<<<< HEAD:disapi/gateway.py
-
-logger = logging.getLogger("disapi.gateway")
-
-=======
 
 logger = logging.getLogger("dapi.gateway")
 
->>>>>>> c43f783 (upd):dapi/gateway.py
 EventCallback = Union[
     Callable[[Dict[str, Any]], Coroutine[Any, Any, None]],
     Callable[[Dict[str, Any]], None],

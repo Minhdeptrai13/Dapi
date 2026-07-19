@@ -1,6 +1,6 @@
-
+"""
 dapi/client.py — Main Discord Client (Async & Sync) — ELITE v4.0
-
+==================================================================
 
 Production-grade async-first client with advanced event system, 
 connection pooling, health checks, and comprehensive lifecycle management.
@@ -467,8 +467,6 @@ class Client:
     async def _dispatch_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Dispatch event to all registered handlers."""
         logger.debug(f"Dispatching event: {event_type}")
-<<<<<<< HEAD:disapi/client.py
-=======
         
         # Set ready event
         if event_type == "READY":
@@ -482,7 +480,6 @@ class Client:
                         future.set_result(data)
                 self._waiters[event_type].clear()
         
->>>>>>> c43f783 (upd):dapi/client.py
         if event_type not in self._event_handlers:
             logger.debug(f"No handlers for {event_type}")
             return
@@ -733,6 +730,7 @@ class Client:
                 asyncio.get_event_loop().run_until_complete(self.close())
             except:
                 pass
+
 
 class SyncClient:
     """Synchronous wrapper around async Client.
